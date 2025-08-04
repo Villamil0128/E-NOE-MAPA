@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Mapa Clima Panamá</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body {
+      margin: 0;
+      background-color: #111;
+    }
+    #map {
+      height: 100vh;
+    }
+    .popup-content {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #fff;
+    }
+    .popup-title {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #ffd700;
+    }
+    .leaflet-popup-content-wrapper {
+      background-color: #2b2b2b;
+      border-radius: 10px;
+    }
+    .leaflet-popup-tip {
+      background-color: #2b2b2b;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Crear el mapa centrado en Panamá
+    const map = L.map('map').setView([8.5, -79.0], 7);
+
+    // Crear un "pane" para las etiquetas
+    map.createPane('labels');
+    map.getPane('labels').style.zIndex = 650;
+    map.getPane('labels').style.pointerEvents = 'none';
+
+    // Fondo satelital
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles © Esri',
+      maxZoom: 19
+    }).addTo(map);
+
+    // Etiquetas encima del satélite
+    L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Labels © Esri',
+      pane: 'labels'
+    }).addTo(map);
+
+    // Estilo para los polígonos
+    function estilo(feature) {
+      return {
+        color: "#00bcd4",
+        weight: 2,
+        fillColor: "#00bcd422",
+        fillOpacity: 0.2
+      };
+    }
+
+    // Acciones cuando se hace clic en una provincia
+    function onEachFeature(feature, layer) {
+      layer.on('click', function(e) {
+        const nombre = feature.properties.name || feature.properties.NAME_1;
+        const { lat, lng } = e.latlng;
+
+        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&hourly=precipitation`)
+          .then(res => res.json())
+          .then(data => {
+            const temp = data.current_weather.temperature;
+            const lluvia_hora = data.hourly.precipitation[0];
+            let alerta ="Normal";
+
+           if (lluvia_hora >= 50) {
+              alerta = "⚠️Lluvia intensa / Alerta de evacuacion";
+            } else if (lluvia_hora > 10 && lluvia_hora < 50) {
+              alerta = "😰Lluvia fuerte / Alerta de vigilancia";
+            } else {
+              alerta = "😁Normal";
+            }
+
+             
+
+            const html = `
+              <div class="popup-content">
+                <div class="popup-title">${nombre}</div>
+                🌡️ Temperatura actual: ${temp} °C<br>
+                🌧️ Lluvia (última hora): ${lluvia_hora} mm<br>
+                🏞️ Estado del río: <strong>${alerta}</strong>
+              </div>
+            `;
+
+            L.popup()
+              .setLatLng([lat, lng])
+              .setContent(html)
+              .openOn(map);
+          })
+          .catch(err => console.error(err));
+      });
+    }
+
+    // Cargar las provincias desde el archivo GeoJSON
+    fetch('provincias-panama.geojson')
+      .then(r => r.json())
+      .then(data => {
+        L.geoJSON(data, { style: estilo, onEachFeature }).addTo(map);
+      });
+  </script>
+</body>
+
+
+
+    <script src="https://cdn.botpress.cloud/webchat/v3.2/inject.js" defer></script>
+<script src="https://files.bpcontent.cloud/2025/07/01/05/20250701050311-CYRYD7EY.js" defer></script>
+</html>
